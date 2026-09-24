@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.json">
+<title>Comic List</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#172033;background:#f5f7fb}
+*{box-sizing:border-box}body{margin:0}.app{max-width:720px;margin:auto;padding:18px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+h1{font-size:26px;margin:0}p{margin:4px 0;color:#64748b;font-size:14px}
+button{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer;background:#2563eb;color:white}
+button.secondary{background:#e2e8f0;color:#172033}button.danger{background:#dc2626}
+input{width:100%;padding:13px;border:1px solid #d7deea;border-radius:12px;font:inherit;background:white}
+.toolbar{display:flex;gap:8px;margin:12px 0}.toolbar input{flex:1}
+.card{background:white;border:1px solid #e5eaf2;border-radius:16px;padding:15px;margin:10px 0;box-shadow:0 3px 12px #17203308}
+.card h3{margin:0 0 6px;font-size:18px}.meta{font-size:13px;color:#64748b;line-height:1.7}
+.actions{display:flex;gap:8px;margin-top:12px}.actions button{font-size:12px;padding:8px 10px}
+dialog{border:0;border-radius:18px;padding:0;width:min(92%,440px);box-shadow:0 20px 60px #0003}
+dialog::backdrop{background:#17203366}.dialog-body{padding:20px}.field{margin:12px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
+.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.empty{text-align:center;padding:38px 12px;color:#64748b}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><h1>Comic List</h1><p>Koleksi komik pribadi • Offline</p></div><button id="addBtn">+ Tambah</button></header>
+<div class="toolbar"><input id="search" placeholder="Cari judul komik..."><button class="secondary" id="sortBtn">A–Z</button></div>
+<div id="list"></div>
+</div>
+
+<dialog id="dialog"><form method="dialog" id="form" class="dialog-body">
+<h2 id="dialogTitle">Tambah Komik</h2>
+<input type="hidden" id="editId">
+<div class="field"><label for="title">Judul komik</label><input id="title" required></div>
+<div class="field"><label for="chapter">Chapter terakhir dibaca</label><input id="chapter" placeholder="Contoh: 125 atau 12.5"></div>
+<div class="field"><label for="date">Tanggal terakhir dibaca</label><input id="date" type="date" required></div>
+<div class="form-actions"><button type="button" class="secondary" id="cancelBtn">Batal</button><button type="submit">Simpan</button></div>
+</form></dialog>
+
+<script>
+const KEY='comic-list-data-v1';
+let comics=JSON.parse(localStorage.getItem(KEY)||'[]');
+let ascending=true;
+const $=id=>document.getElementById(id);
+const today=()=>new Date().toISOString().slice(0,10);
+const save=()=>localStorage.setItem(KEY,JSON.stringify(comics));
+const fmt=d=>d?new Date(d+'T00:00:00').toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';
+
+function render(){
+ const q=$('search').value.toLowerCase().trim();
+ let rows=comics.filter(c=>c.title.toLowerCase().includes(q)).sort((a,b)=>ascending?a.title.localeCompare(b.title,'id'):b.title.localeCompare(a.title,'id'));
+ $('list').innerHTML=rows.length?rows.map(c=>`<article class="card"><h3>${escapeHtml(c.title)}</h3><div class="meta">Chapter terakhir: <b>${escapeHtml(c.chapter||'-')}</b><br>Terakhir dibaca: ${fmt(c.date)}</div><div class="actions"><button class="secondary" onclick="editComic('${c.id}')">Edit</button><button class="danger" onclick="deleteComic('${c.id}')">Hapus</button></div></article>`).join(''):'<div class="empty">Belum ada komik. Tekan + Tambah untuk memulai.</div>';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+function openNew(){ $('form').reset();$('editId').value='';$('date').value=today();$('dialogTitle').textContent='Tambah Komik';$('dialog').showModal();}
+function editComic(id){let c=comics.find(x=>x.id===id);if(!c)return;$('editId').value=id;$('title').value=c.title;$('chapter').value=c.chapter;$('date').value=c.date;$('dialogTitle').textContent='Edit Komik';$('dialog').showModal();}
+function deleteComic(id){if(confirm('Hapus komik ini?')){comics=comics.filter(c=>c.id!==id);save();render();}}
+$('addBtn').onclick=openNew;$('cancelBtn').onclick=()=>$('dialog').close();$('search').oninput=render;
+$('sortBtn').onclick=()=>{ascending=!ascending;$('sortBtn').textContent=ascending?'A–Z':'Z–A';render();};
+$('form').onsubmit=e=>{e.preventDefault();let id=$('editId').value;let item={id:id||crypto.randomUUID(),title:$('title').value.trim(),chapter:$('chapter').value.trim(),date:$('date').value};if(!item.title||!item.date)return;if(id)comics=comics.map(c=>c.id===id?item:c);else comics.push(item);save();render();$('dialog').close();};
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
+render();
+</script>
+</body>
+</html>
